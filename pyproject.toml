@@ -1,0 +1,17 @@
+[project]
+name = "board-game-canvas-api"
+version = "0.1.0"
+description = "Board game canvas generation API for Vercel Serverless."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "fastapi==0.110.0",
+  "mangum==0.17.0",
+  "mistune==3.0.2",
+  "pydantic==2.6.4",
+  "requests==2.31.0",
+  "uvicorn==0.29.0",
+]
+
+[tool.uv]
+package = false

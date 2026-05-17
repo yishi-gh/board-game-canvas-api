@@ -1,0 +1,15 @@
+{
+  "version": 2,
+  "functions": {
+    "api/main.py": {
+      "includeFiles": "templates/**",
+      "excludeFiles": "{.venv/**,**/__pycache__/**,*.md}"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/api/main"
+    }
+  ]
+}
