@@ -1,6 +1,6 @@
 from enum import Enum
 
-from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field, field_validator
+from pydantic import AliasChoices, AnyHttpUrl, BaseModel, ConfigDict, Field, field_validator
 
 from app.image_utils import normalize_image_source
 
@@ -12,9 +12,17 @@ class Resolution(str, Enum):
 
 
 class GenerateReportRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    model_config = ConfigDict(
+        extra="forbid",
+        str_strip_whitespace=True,
+        protected_namespaces=(),
+    )
 
-    model_url: AnyHttpUrl
+    model_api_url: AnyHttpUrl = Field(
+        ...,
+        validation_alias=AliasChoices("model_api_url", "model_url"),
+    )
+    hcti_api_url: AnyHttpUrl
     resolution: Resolution
     report_md: str = Field(..., min_length=1)
     board_image: str = Field(..., min_length=1)

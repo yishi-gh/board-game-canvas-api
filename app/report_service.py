@@ -13,7 +13,7 @@ def generate_report(payload: GenerateReportRequest) -> GenerateReportResponse:
     board_image_source = normalize_image_source(payload.board_image)
 
     background_image = generate_background_image(
-        model_url=str(payload.model_url),
+        model_api_url=str(payload.model_api_url),
         resolution=payload.resolution,
         preset=preset,
         report_main_markdown=parsed_report.main_markdown,
@@ -30,6 +30,7 @@ def generate_report(payload: GenerateReportRequest) -> GenerateReportResponse:
     rendered_image = render_png_from_html(
         html_document=html_document,
         preset=preset,
+        hcti_api_url=str(payload.hcti_api_url),
     )
     return GenerateReportResponse(
         resolution=payload.resolution,

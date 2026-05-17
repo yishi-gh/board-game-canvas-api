@@ -15,6 +15,49 @@
 - 模板资源：`templates/base.html` + `templates/*.css`
 - 运行模式：服务端读取模板，内联 CSS，交给转图服务渲染
 
+## 工作原理
+
+请求进入 `POST /api/v1/generate_report` 后，服务端会按固定链路处理每个参数。
+
+### 参数去向
+
+| 参数 | 作用 |
+| --- | --- |
+| `model_api_url` | 作为上游生图模型地址，由服务端发起请求生成背景图。兼容旧字段 `model_url`，但推荐使用新名字。 |
+| `hcti_api_url` | 作为 HCTI 转图接口地址传入请求体，用于生成最终成品图。 |
+| `resolution` | 选择画布尺寸、背景图提示词预设，以及最终使用的 CSS 模板。 |
+| `report_md` | 拆成“战报正文”和“玩家摘要”两部分；正文转 HTML，摘要用于右下角信息区。 |
+| `board_image` | 作为版图参考图传给上游模型，支持 URL、Data URI、纯 Base64。 |
+| `rules_md` | 作为规则摘要传给上游模型，帮助生成更贴合战报内容的背景。 |
+| `custom_prompt` | 可选补充提示词，追加到上游模型请求中。 |
+
+### 处理流程
+
+1. 服务端先校验请求参数。
+   `model_api_url` 和 `hcti_api_url` 都必须是合法 HTTP 地址，`resolution` 只能是 `vertical`、`horizontal`、`square`，`report_md`、`board_image`、`rules_md` 不能为空。
+
+2. `board_image` 会先被标准化。
+   如果传入的是 URL，就原样使用；如果传入的是 Data URI 或纯 Base64，服务端会校验后统一整理成可继续传递的图片引用格式。
+
+3. `report_md` 会被拆解。
+   它必须以这三行结尾：`- ID: ...`、`- Score: ...`、`- Quote: ...`。这三行会被提取成 `player` 信息，其余正文部分会转成 HTML，作为最终战报主内容。
+
+4. `resolution` 会选中一套预设。
+   预设同时决定最终宽高、给上游模型的构图提示词，以及使用哪份 CSS 模板：
+   `vertical = 1080 x 1920`，`horizontal = 1920 x 1080`，`square = 1200 x 1200`。
+
+5. 服务端调用 `model_api_url` 生成背景图。
+   请求里会带上分辨率信息、规则摘要、战报正文摘录、版图参考图，以及可选的 `custom_prompt`。上游返回的图片地址会作为 `background_image`。
+
+6. 服务端拼装最终 HTML。
+   `templates/base.html` 会加载对应分辨率的 CSS 模板，把 `background_image` 注入背景层，把 `report_md` 转出的 HTML 注入正文区域，再把 `ID / Score / Quote` 注入玩家信息区域。
+
+7. 服务端把 HTML 交给转图供应商。
+   当前支持 `hcti` 和 `htmlcsstoimage`。当供应商为 `hcti` 时，请求中的 `hcti_api_url` 会作为本次调用的转图接口地址；供应商接收完整 HTML 和视口尺寸，返回最终成品图地址。
+
+8. 服务端组装响应并返回。
+   返回值里包含背景图地址 `background_image`、最终图片地址 `output_image_url`、最终图片 Base64 `output_image_base64`、图片类型 `output_image_mime_type`，以及从 `report_md` 中提取出的 `player` 信息。
+
 ## 部署
 
 ### 本地启动
@@ -39,7 +82,7 @@ $env:HTML_TO_IMAGE_PROVIDER="htmlcsstoimage"
 $env:HTMLCSSTOIMAGE_API_KEY="your_api_key"
 ```
 
-如果上游 `model_url` 需要统一鉴权：
+如果上游 `model_api_url` 需要统一鉴权：
 
 ```powershell
 $env:MODEL_API_KEY="your_model_api_key"
@@ -72,6 +115,7 @@ uv run uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
   - `HTML_TO_IMAGE_PROVIDER=hcti`
   - `HCTI_USER_ID`
   - `HCTI_API_KEY`
+  - `HCTI_API_URL`
 - 使用 `htmlcsstoimage`
   - `HTML_TO_IMAGE_PROVIDER=htmlcsstoimage`
   - `HTMLCSSTOIMAGE_API_KEY`
@@ -88,7 +132,8 @@ uv run uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
 
 ### 请求参数
 
-- `model_url`：上游生图模型接口地址
+- `model_api_url`：上游生图模型接口地址，兼容旧字段 `model_url`
+- `hcti_api_url`：HCTI 转图接口地址，例如 `https://hcti.io/v1/image`
 - `resolution`：`vertical`、`horizontal`、`square`
 - `report_md`：战报 Markdown
 - `board_image`：版图图片，支持 URL、Data URI、纯 Base64
@@ -99,7 +144,8 @@ uv run uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
 
 ```json
 {
-  "model_url": "https://your-model-api.example.com/generate",
+  "model_api_url": "https://your-model-api.example.com/generate",
+  "hcti_api_url": "https://hcti.io/v1/image",
   "resolution": "vertical",
   "report_md": "# 战报标题\n这里是战报正文\n\n- ID: 玩家甲\n- Score: 120\n- Quote: 控场完美。",
   "board_image": "https://example.com/board.png",
@@ -114,7 +160,8 @@ uv run uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
 curl -X POST "https://your-domain.vercel.app/api/v1/generate_report" \
   -H "Content-Type: application/json" \
   -d '{
-    "model_url": "https://your-model-api.example.com/generate",
+    "model_api_url": "https://your-model-api.example.com/generate",
+    "hcti_api_url": "https://hcti.io/v1/image",
     "resolution": "vertical",
     "report_md": "# 标题\n正文...\n\n- ID: 玩家甲\n- Score: 120\n- Quote: 控场完美。",
     "board_image": "https://example.com/board.png",
@@ -161,7 +208,8 @@ uv run python scripts/manual_generate_report.py
 脚本会要求输入：
 
 - API Base URL
-- `model_url`
+- `model_api_url`
+- `hcti_api_url`
 - `resolution`
 - `board_image`
 - `report_md`

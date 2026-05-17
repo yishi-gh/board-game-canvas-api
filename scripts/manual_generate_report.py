@@ -109,7 +109,8 @@ def load_local_image_as_data_uri(raw_path: str) -> str:
 
 
 def build_payload() -> dict[str, str]:
-    model_url = prompt_required("请输入 model_url")
+    model_api_url = prompt_required("请输入 model_api_url")
+    hcti_api_url = prompt_required("请输入 hcti_api_url", default="https://hcti.io/v1/image")
     resolution = prompt_choice(
         "请输入分辨率",
         allowed_values={"vertical", "horizontal", "square"},
@@ -121,7 +122,8 @@ def build_payload() -> dict[str, str]:
     custom_prompt = prompt_optional_multiline("请输入 custom_prompt")
 
     payload: dict[str, str] = {
-        "model_url": model_url,
+        "model_api_url": model_api_url,
+        "hcti_api_url": hcti_api_url,
         "resolution": resolution,
         "report_md": report_md,
         "board_image": board_image,

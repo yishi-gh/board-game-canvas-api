@@ -7,7 +7,7 @@ from app.upstream import extract_image_reference, parse_response_payload
 
 
 def generate_background_image(
-    model_url: str,
+    model_api_url: str,
     resolution: Resolution,
     preset: ResolutionPreset,
     report_main_markdown: str,
@@ -40,7 +40,7 @@ def generate_background_image(
         },
     }
     response = requests.post(
-        model_url,
+        model_api_url,
         json=payload,
         headers=build_model_headers(),
         timeout=settings.request_timeout_seconds,

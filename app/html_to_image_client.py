@@ -6,12 +6,20 @@ from app.image_utils import resolve_image_payload
 from app.upstream import extract_image_reference, parse_response_payload
 
 
-def render_png_from_html(html_document: str, preset: ResolutionPreset) -> RenderedImage:
+def render_png_from_html(
+    html_document: str,
+    preset: ResolutionPreset,
+    hcti_api_url: str | None = None,
+) -> RenderedImage:
     settings = get_settings()
     provider = settings.html_to_image_provider
 
     if provider == "hcti":
-        return render_with_hcti(html_document=html_document, preset=preset)
+        return render_with_hcti(
+            html_document=html_document,
+            preset=preset,
+            hcti_api_url=hcti_api_url,
+        )
 
     if provider == "htmlcsstoimage":
         return render_with_htmlcsstoimage(html_document=html_document, preset=preset)
@@ -19,7 +27,11 @@ def render_png_from_html(html_document: str, preset: ResolutionPreset) -> Render
     raise RuntimeError("Unsupported HTML_TO_IMAGE_PROVIDER. Use 'hcti' or 'htmlcsstoimage'.")
 
 
-def render_with_hcti(html_document: str, preset: ResolutionPreset) -> RenderedImage:
+def render_with_hcti(
+    html_document: str,
+    preset: ResolutionPreset,
+    hcti_api_url: str | None = None,
+) -> RenderedImage:
     settings = get_settings()
     if not settings.hcti_user_id or not settings.hcti_api_key:
         raise RuntimeError(
@@ -27,7 +39,7 @@ def render_with_hcti(html_document: str, preset: ResolutionPreset) -> RenderedIm
         )
 
     response = requests.post(
-        settings.hcti_api_url,
+        hcti_api_url or settings.hcti_api_url,
         data={
             "html": html_document,
             "viewport_width": preset.width,
